@@ -21,6 +21,7 @@
 
 #import "ServerFromPrefs.h"
 #import "KeyChain.h"
+#import "IServerData.h"
 
 #define RFB_NAME          @"Name"
 #define RFB_HOST		  @"Host"
@@ -46,6 +47,8 @@
 {
     if( self = [super init] )
 	{
+		_delegate =         nil;
+		
 		_name =             [[NSString stringWithString:host] retain];
 		_host =             [host retain];
 		_password =         [[NSString stringWithString:[[KeyChain defaultKeyChain] genericPasswordForService:KEYCHAIN_SERVICE_NAME account:_name]] retain];
@@ -184,20 +187,31 @@
 
 - (void)setName: (NSString*)name
 {
-	// if the password is saved, destroy the one off the old name key
-	if( YES == _rememberPassword)
+	if( 0 != [name compare:_name] )
 	{
-		[[KeyChain defaultKeyChain] removeGenericPasswordForService:KEYCHAIN_SERVICE_NAME account:_name];
-	}
-	
-	[_name release];
-	_name = name;
-	[_name retain];
-	
-	// if the password should be saved, save it with the new name key
-	if( YES == _rememberPassword)
-	{
-		[[KeyChain defaultKeyChain] setGenericPassword:_password forService:KEYCHAIN_SERVICE_NAME account:_name];
+		if( nil != _delegate )
+		{
+			[_delegate validateNameChange:name forServer:self];
+		}
+		
+		// if the password is saved, destroy the one off the old name key
+		if( YES == _rememberPassword)
+		{
+			[[KeyChain defaultKeyChain] removeGenericPasswordForService:KEYCHAIN_SERVICE_NAME account:_name];
+		}
+		
+		[_name release];
+		_name = name;
+		[_name retain];
+		
+		// if the password should be saved, save it with the new name key
+		if( YES == _rememberPassword)
+		{
+			[[KeyChain defaultKeyChain] setGenericPassword:_password forService:KEYCHAIN_SERVICE_NAME account:_name];
+		}
+		
+		[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+															object:self];
 	}
 }
 
@@ -206,6 +220,9 @@
 	[_host release];
 	_host = host;
 	[_host retain];
+	
+	[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+														object:self];
 }
 
 - (void)setPassword: (NSString*)password
@@ -219,6 +236,9 @@
 	{
 		[[KeyChain defaultKeyChain] setGenericPassword:_password forService:KEYCHAIN_SERVICE_NAME account:_name];
 	}
+	
+	[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+														object:self];
 }
 
 - (void)setRememberPassword: (bool)rememberPassword
@@ -234,26 +254,41 @@
 	{
 		[[KeyChain defaultKeyChain] removeGenericPasswordForService:KEYCHAIN_SERVICE_NAME account:_name];
 	}
+	
+	[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+														object:self];
 }
 
 - (void)setDisplay: (int)display
 {
 	_display = display;
+	
+	[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+														object:self];
 }
 
 - (void)setLastDisplay: (int)lastDisplay
 {
 	_lastDisplay = lastDisplay;
+	
+	[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+														object:self];
 }
 
 - (void)setShared: (bool)shared
 {
 	_shared = shared;
+	
+	[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+														object:self];
 }
 
 - (void)setFullscreen: (bool)fullscreen
 {
 	_fullscreen =  fullscreen;
+	
+	[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+														object:self];
 }
 
 - (void)setLastProfile: (NSString*)lastProfile
@@ -261,6 +296,14 @@
 	[_lastProfile release];
 	_lastProfile = lastProfile;
 	[_lastProfile retain];
+	
+	[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+														object:self];
+}
+
+- (void)setDelegate: (id)delegate
+{
+	_delegate = delegate;
 }
 
 @end

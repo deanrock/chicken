@@ -96,4 +96,9 @@
 - (id)initWithCoder:(NSCoder*)coder;
 //@}
 
+/** 
+ *	The primary goal of this function is to force servers to have unique names
+ */
+- (void)ValidateNameChange:(NSString *)Name forServer:(id<IServerData>)server;
+
 @end

@@ -63,6 +63,7 @@ static ServerDataManager* instance = nil;
 			id<IServerData> server = [ServerFromPrefs createWithHost:host preferenceDictionary:obj];
 			if( nil != server )
 			{
+				[server setDelegate:self];
 				[servers setObject:server forKey:[server name]];
 			}
 		}
@@ -133,6 +134,13 @@ static ServerDataManager* instance = nil;
 		assert( [coder allowsKeyedCoding] );
 		
 		servers = [[coder decodeObjectForKey:RFB_SERVER_LIST] retain];
+		
+		id<IServerData> server;
+		NSEnumerator* objEnumerator = [servers objectEnumerator];
+		while( server = [objEnumerator nextObject] )
+		{
+			[server setDelegate:self];
+		}
 	}
 	
     return self;
@@ -159,6 +167,11 @@ static ServerDataManager* instance = nil;
 
 - (id<IServerData>)getServerAtIndex:(int)index
 {
+	if( 0 > index )
+	{
+		return nil;
+	}
+	
 	return [[servers allValues] objectAtIndex:index];
 }
 
@@ -171,7 +184,7 @@ static ServerDataManager* instance = nil;
 														object:self];
 }
 
-- (id<IServerData>)createServerByName:(NSString*)name
+- (NSString*)makeNameUnique:(NSString*)name
 {
 	if(nil != [servers objectForKey:name])
 	{
@@ -182,15 +195,46 @@ static ServerDataManager* instance = nil;
 			numHelper++;
 			newName = [NSString stringWithFormat:@"%@_%d", name, numHelper];
 		}while( nil != [servers objectForKey:newName] );
-		name = newName;
+		
+		return newName;
 	}
 	
+	return name;
+}
+
+- (id<IServerData>)createServerByName:(NSString*)name
+{
+	name = [self makeNameUnique:name];
+	
 	ServerFromPrefs* newServer = [ServerFromPrefs createWithName:name];
-	[servers setObject:newServer forKey:name];
+	[servers setObject:newServer forKey:[newServer name]];
+	
+	assert( nil != [servers objectForKey:name] );
+	assert( newServer == [servers objectForKey:name] );
+	
+	[newServer setDelegate:self];
 	
 	[[NSNotificationCenter defaultCenter] postNotificationName:ServerListChangeMsg
 														object:self];
 	
 	return newServer;
+}
+
+- (void)validateNameChange:(NSString *)name forServer:(id<IServerData>)server;
+{
+	if( nil != [servers objectForKey:[server name]] )
+	{
+		assert( server == [servers objectForKey:[server name]] );
+
+		[servers removeObjectForKey:[server name]];
+
+		name = [self makeNameUnique:name];
+
+		[server setName:name];
+		[servers setObject:server forKey:[server name]];
+
+		[[NSNotificationCenter defaultCenter] postNotificationName:ServerListChangeMsg
+															object:self];
+	}
 }
 @end

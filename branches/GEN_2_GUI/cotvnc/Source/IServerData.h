@@ -21,6 +21,8 @@
 
 #import <Foundation/Foundation.h>
 
+/** Implementers of IServerData will send this notification when a property has changed */
+#define ServerChangeMsg @"ServerChangeMsg"
 
 @protocol IServerData
 
@@ -43,5 +45,13 @@
 - (void)setShared: (int)shared;
 - (void)setFullscreen: (bool)fullscreen;
 - (void)setLastProfile: (NSString*)lastProfile;
+
+- (void)setDelegate: (id)delegate;
+
+@end
+
+@interface NSObject(IServerDataDelegate)
+
+- (void)ValidateNameChange:(NSString *)Name forServer:(id<IServerData>)server;
 
 @end

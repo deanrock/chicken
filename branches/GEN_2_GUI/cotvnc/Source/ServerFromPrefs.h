@@ -34,6 +34,8 @@
 	NSString* _lastProfile;
 	
 	NSMutableDictionary* _prefDict;
+	
+	id        _delegate;
 }
 
 + (id<IServerData>)createWithName:(NSString*)name;
@@ -70,5 +72,7 @@
 - (void)setShared: (bool)shared;
 - (void)setFullscreen: (bool)fullscreen;
 - (void)setLastProfile: (NSString*)lastProfile;
+
+- (void)setDelegate: (id)delegate;
 
 @end
