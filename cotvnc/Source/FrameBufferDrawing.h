@@ -270,13 +270,13 @@ printf("copy x=%f y=%f w=%f h=%f -> x=%f y=%f\n", aRect.origin.x, aRect.origin.y
         start = pixels + (int)(aRect.origin.y * size.width) + (int)aRect.origin.x;
         lines = aRect.size.height;
         stride = size.width - aRect.size.width;
-		while(lines--) {
+        while(lines--) {
 			for(i=aRect.size.width; i; i--) {
-				*start++ = cvt_pixel24(data, self);
-				data += 3;
-			}
-			start += stride;
-		}
+                *start++ = cvt_pixel24(data, self);
+                data += 3;
+            }
+            start += stride;
+        }
     } else {
         [self putRect:aRect fromData:data];
     }
