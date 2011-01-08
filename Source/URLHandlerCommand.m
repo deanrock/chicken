@@ -67,6 +67,7 @@ if (!(condition)) return [self scriptError: (errno) description: \
 	NSString *hostAndPort = [NSString stringWithFormat: @"%@:%@", [url host], portString];
 	
 	ServerStandAlone* server = [[ServerStandAlone alloc] init];
+	[server setName:[url host]];
 	[server setHostAndPort:hostAndPort];
 	[server setPassword:[url password]];
 	

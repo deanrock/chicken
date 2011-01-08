@@ -23,8 +23,6 @@
 #import <Foundation/Foundation.h>
 #import "IServerData.h"
 
-@class ServerFromPrefs;
-
 /**
  *  ServerDataManager manages all known accessible servers in Chicken of the VNC
  *  including saved server from preferences, rendezvous servers, etc. Servers will
@@ -36,7 +34,7 @@
  *  This is a singleton class. Always access the class through the sharedInstance
  *  function. Do not create an instance yourself.
  */
-@interface ServerDataManager : NSObject {
+@interface ServerDataManager : NSObject <NSCoding,IServerDataDelegate> {
 	
 	NSMutableDictionary* mServers;
 	NSMutableDictionary* mGroups;
@@ -129,7 +127,7 @@
  *  @param name The name to create the server as.
  *  @return The created server.
  */
-- (ServerFromPrefs *)createServerByName:(NSString*)name;
+- (id<IServerData>)createServerByName:(NSString*)name;
 
 /*
  *  Adds an existing server to the server list. A new server will be created in the
@@ -138,12 +136,13 @@
  *  @param server The server to add.
  *  @return The new server (the one that is stored).
  */
-- (ServerFromPrefs *)addServer:(id<IServerData>)server;
+- (id<IServerData>)addServer:(id<IServerData>)server;
 
 /* @name Archiving and Unarchiving
  * Implements the NSCoding protocol for serialization
  */
 //@{
+- (void)encodeWithCoder:(NSCoder*)coder;
 - (id)initWithCoder:(NSCoder*)coder;
 //@}
 

@@ -1,5 +1,5 @@
 //
-//  ServerFromPrefs.h
+//  IServerData.h
 //  Chicken of the VNC
 //
 //  Created by Jared McIntyre on Sat Jan 24 2004.
@@ -20,55 +20,61 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "IServerData.h"
 
-#define PORT_BASE 5900
+/** Implementers of IServerData will send this notification when a property has changed */
+#define ServerChangeMsg @"ServerChangeMsg"
 
-@class Profile;
+typedef enum
+{
+	EDIT_ADDRESS,
+	EDIT_PORT,
+	EDIT_NAME,
+	EDIT_PASSWORD,
+	SAVE_PASSWORD,
+	CONNECT,
+} SUPPORT_TYPE;
 
-@interface ServerBase : NSObject <IServerData> {
-	NSString* _host;
-	NSString* _password;
-	int       _port;
-	bool      _shared;
-	bool      _fullscreen;
-	bool      _viewOnly;	
-    Profile   *_profile;
-}
+@protocol IServerDataDelegate;
 
-- (id)init;
-- (void)dealloc;
+@protocol IServerData <NSObject>
 
-/** @name IServerData
- *  Implements the IServerData protocol
- */
-//@{
 - (bool)doYouSupport: (SUPPORT_TYPE)type;
 
 - (NSString*)name;
 - (NSString*)host;
+- (NSString*)hostAndPort;
 - (NSString*)password;
-- (BOOL)rememberPassword;
+- (bool)rememberPassword;
+- (int)display;
+- (bool)isPortSpecifiedInHost;
 - (int)port;
 - (bool)shared;
 - (bool)fullscreen;
 - (bool)viewOnly;
-- (Profile *)profile;
+- (NSString*)lastProfile;
 - (bool)addToServerListOnConnect;
 
+- (void)setName: (NSString*)name;
 - (void)setHost: (NSString*)host;
-- (BOOL)setHostAndPort: (NSString*)host;
+- (void)setHostAndPort: (NSString*)host;
 - (void)setPassword: (NSString*)password;
+- (void)setRememberPassword: (bool)rememberPassword;
 - (void)setDisplay: (int)display;
-- (void)setShared: (bool)shared;
 - (void)setPort: (int)port;
+- (void)setShared: (bool)shared;
 - (void)setFullscreen: (bool)fullscreen;
 - (void)setViewOnly: (bool)viewOnly;
-- (void)setProfile: (Profile *)profile;
-- (void)setProfileName: (NSString *)profileName;
+- (void)setLastProfile: (NSString*)lastProfile;
 
 - (void)copyServer: (id<IServerData>)server;
 
-//@}
+- (void)setDelegate: (id<IServerDataDelegate>)delegate;
+
+@end
+
+
+@protocol IServerDataDelegate
+
+- (void)validateNameChange:(NSString *)name forServer:(id<IServerData>)server;
 
 @end

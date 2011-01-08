@@ -46,6 +46,7 @@
 
         delegate = aDelegate;
 
+        [self retain]; // on behalf of new thread
         [NSThread detachNewThreadSelector: @selector(connect:) toTarget: self
                                withObject: nil];
             
@@ -65,7 +66,7 @@
 
 - (void)setErrorStr:(NSString *)str
 {
-    [errorStr autorelease];
+    [errorStr release];
     errorStr = [str retain];
 }
 
@@ -90,7 +91,9 @@
     return host ? host : DEFAULT_HOST;
 }
 
-/* Attempts to connect to the server. */
+/* Attempts to connect to the server. Note that connect: has had a retain
+ * performed for it by initWithServer, so before exiting it must ensure that
+ * release gets called on the main thread. */
 - (void)connect: (id)unused
 {
     int             error;
@@ -213,6 +216,7 @@
         [theConnection release];
         currentSock = -1;
     }
+    [self release];
 }
 
 /* DNS lookup has failed. Executed in main thread. */
@@ -259,6 +263,7 @@
 {
     if (delegate == nil) {
         // only show error if we haven't been canceled
+        [self release];
         return;
     }
 
@@ -284,6 +289,7 @@
         contextInfo:(void *)info
 {
     [delegate connectionFailed];
+    [self release];
 }
 
 @end

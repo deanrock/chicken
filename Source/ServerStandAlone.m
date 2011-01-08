@@ -43,6 +43,8 @@
 		case EDIT_PASSWORD:
 		case CONNECT:
 			return YES;
+		case SAVE_PASSWORD:
+			return mAddToServerListOnConnect;
 	}
 	
     // shouldn't ever get here
@@ -62,6 +64,14 @@
 - (void)setAddToServerListOnConnect: (bool)addToServerListOnConnect
 {
 	mAddToServerListOnConnect = addToServerListOnConnect;
+	
+	if( NO == addToServerListOnConnect )
+	{
+		[self setRememberPassword:NO];
+	}
+	
+	[[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
+														object:self];
 }
 
 @end

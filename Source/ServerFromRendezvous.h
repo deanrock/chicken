@@ -20,12 +20,10 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "PersistentServer.h"
+#import "ServerBase.h"
 #import "IServerData.h"
 
-#define RFB_SAVED_RENDEZVOUS_SERVERS @"RFB_SAVED_RENDEZVOUS_SERVERS"
-
-@interface ServerFromRendezvous : PersistentServer {
+@interface ServerFromRendezvous : ServerBase {
 	NSNetService* service_;
 	bool bHasResolved;
 	bool bResloveSucceeded;
@@ -38,7 +36,14 @@
 
 - (bool)doYouSupport: (SUPPORT_TYPE)type;
 
+- (NSString*)host;
+- (NSString*)hostAndPort;
+
+- (void)setDelegate: (id<IServerDataDelegate>)delegate;
+
 - (void)netService:(NSNetService *)sender didNotResolve:(NSDictionary *)errorDict;
 - (void)netServiceDidResolveAddress:(NSNetService *)sender;
+
+- (void)save;
 
 @end

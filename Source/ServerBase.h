@@ -1,5 +1,5 @@
 //
-//  IServerData.h
+//  ServerFromPrefs.h
 //  Chicken of the VNC
 //
 //  Created by Jared McIntyre on Sat Jan 24 2004.
@@ -20,49 +20,65 @@
 //
 
 #import <Foundation/Foundation.h>
+#import "IServerData.h"
 
-/** Implementers of IServerData will send this notification when a property has changed */
-#define ServerChangeMsg @"ServerChangeMsg"
+#define PORT_BASE 5900
+#define DISPLAY_MAX 50 // numbers >= this are interpreted as a port
 
-typedef enum
-{
-	EDIT_ADDRESS,
-	EDIT_PORT,
-	EDIT_NAME,
-	EDIT_PASSWORD,
-	CONNECT,
-} SUPPORT_TYPE;
+@interface ServerBase : NSObject <IServerData> {
+	NSString* _name;
+	NSString* _host;
+	NSString* _hostAndPort;
+	NSString* _password;
+	bool      _rememberPassword;
+	int       _display; // value entered in "Display or port" box
+	int       _port;
+	bool      _shared;
+	bool      _fullscreen;
+	bool      _viewOnly;	
+	NSString* _lastProfile;
+    bool      _isPortSpecifiedInHost;
+	id<IServerDataDelegate> _delegate;
+}
 
-@class Profile;
+- (id)init;
+- (void)dealloc;
 
-@protocol IServerData <NSObject>
-
+/** @name IServerData
+ *  Implements the IServerData protocol
+ */
+//@{
 - (bool)doYouSupport: (SUPPORT_TYPE)type;
 
 - (NSString*)name;
 - (NSString*)host;
+- (NSString*)hostAndPort;
 - (NSString*)password;
 - (bool)rememberPassword;
+- (int)display;
+- (bool)isPortSpecifiedInHost;
 - (int)port;
 - (bool)shared;
 - (bool)fullscreen;
 - (bool)viewOnly;
-- (Profile *)profile;
+- (NSString*)lastProfile;
 - (bool)addToServerListOnConnect;
 
+- (void)setName: (NSString*)name;
 - (void)setHost: (NSString*)host;
-- (BOOL)setHostAndPort: (NSString*)host;
+- (void)setHostAndPort: (NSString*)host;
 - (void)setPassword: (NSString*)password;
+- (void)setRememberPassword: (bool)rememberPassword;
 - (void)setDisplay: (int)display;
-- (void)setPort: (int)port;
 - (void)setShared: (bool)shared;
+- (void)setPort: (int)port;
 - (void)setFullscreen: (bool)fullscreen;
 - (void)setViewOnly: (bool)viewOnly;
-- (void)setProfile: (Profile *)profile;
+- (void)setLastProfile: (NSString*)lastProfile;
 
-- (void)copyServer: (id<IServerData>)server;
+- (void)setDelegate: (id<IServerDataDelegate>)delegate;
 
-@optional
-- (void)setRememberPassword: (BOOL)rememberPassword;
+- (void)profileListUpdate:(id)notification;
+//@}
 
 @end

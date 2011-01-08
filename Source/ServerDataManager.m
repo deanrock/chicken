@@ -29,7 +29,6 @@
 #define RFB_SERVER_LIST     @"ServerList"
 #define RFB_GROUP_LIST		@"GroupList"
 #define RFB_SAVED_SERVERS   @"SavedServers"
-#define RFB_SAVED_SERVERS2  @"SavedServers2"
 
 @implementation ServerDataManager
 
@@ -40,7 +39,6 @@ static ServerDataManager* gInstance = nil;
 	[ServerDataManager setVersion:1];
 }
 
-/* Initialize an empty server list */
 - (id)init
 {
 	if( self = [super init] )
@@ -69,8 +67,6 @@ static ServerDataManager* gInstance = nil;
 	return self;
 }
 
-/* Initialize from some old format for the preferences. Not sure when this was
- * used, but it pre-dates version 2.0b4. */
 - (id)initWithOriginalPrefs
 {
 	if( self = [self init] )
@@ -86,35 +82,13 @@ static ServerDataManager* gInstance = nil;
 			id<IServerData> server = [ServerFromPrefs createWithHost:host preferenceDictionary:obj];
 			if( nil != server )
 			{
+				[server setDelegate:self];
 				[mServers setObject:server forKey:[server name]];
 			}
 		}
 	}
 	
 	return self;
-}
-
-/* Initialize from servers as stored by versions 2.2 and later */
-- (id)initFromDictionary:(NSDictionary *)servers
-{
-    if (self = [self init]) {
-        NSEnumerator    *e = [servers keyEnumerator];
-        NSString        *name;
-        NSMutableDictionary    *standServers = [mGroups objectForKey:@"Standard"];
-
-        while (name = [e nextObject]) {
-            NSDictionary    *dict = [servers objectForKey:name];
-            ServerFromPrefs *server;
-
-            server = [[ServerFromPrefs alloc] initWithName:name
-                                             andDictionary:dict];
-            [mServers setObject:server forKey:name];
-            [standServers setObject:server forKey:name];
-            [server release];
-        }
-    }
-
-    return self;
 }
 
 - (void)dealloc
@@ -141,26 +115,22 @@ static ServerDataManager* gInstance = nil;
 	gInstance = nil;
 }
 
+- (void)save
+{
+	NSData *data = [NSKeyedArchiver archivedDataWithRootObject: gInstance];
+	[[NSUserDefaults standardUserDefaults] setObject: data forKey: RFB_SAVED_SERVERS];
+}
+
 + (ServerDataManager*) sharedInstance
 {
 	if( nil == gInstance )
 	{
-        NSUserDefaults  *defaults = [NSUserDefaults standardUserDefaults];
-        NSDictionary    *servers = [defaults objectForKey:RFB_SAVED_SERVERS2];
-
-        // server list format in 2.2 and later
-        if (servers)
-            gInstance = [[ServerDataManager alloc] initFromDictionary:servers];
-
-        if (nil == gInstance) {
-            // servers saved by 2.1 or earlier
-            NSData *data = [defaults objectForKey:RFB_SAVED_SERVERS];
-            if ( data )
-            {
-                gInstance = [NSKeyedUnarchiver unarchiveObjectWithData:data];
-                [gInstance retain];
-            }
-        }
+		NSData *data = [[NSUserDefaults standardUserDefaults] objectForKey:RFB_SAVED_SERVERS];
+		if ( data )
+		{
+			gInstance = [NSKeyedUnarchiver unarchiveObjectWithData:data];
+			[gInstance retain];
+		}
 		
 		if( nil == gInstance )
 		{
@@ -182,14 +152,51 @@ static ServerDataManager* gInstance = nil;
 		{
 			[gInstance createServerByName:NSLocalizedString(@"RFBDefaultServerName", nil)];
 		}
-        
-        [gInstance useRendezvous:[[PrefController sharedController] usesRendezvous]];
 	}
 	
 	return gInstance;
 }
 
-/* This is called when loading servers saved by version 2.1 and earlier. */
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    NSParameterAssert( [coder allowsKeyedCoding] );
+
+	// make a mutable copy of our server groups so we can remove unsavable servers
+	NSMutableDictionary *savableGroups = [NSMutableDictionary dictionary];
+	NSEnumerator *groupNameEnumerator = [mGroups keyEnumerator];
+	NSString *groupName;
+	
+	while ( groupName = [groupNameEnumerator nextObject] )
+	{
+		NSDictionary *originalServers = [mGroups objectForKey: groupName];
+		NSMutableDictionary *newServers = [NSMutableDictionary dictionaryWithDictionary: originalServers];
+		[savableGroups setObject: newServers forKey: groupName];
+	}
+	
+	// and remove the unsavable servers
+	NSMutableDictionary *savableServers = [NSMutableDictionary dictionaryWithDictionary: mServers];
+	NSEnumerator *serverNameEnumerator = [mServers keyEnumerator];
+	NSString *serverName;
+	
+	while ( serverName = [serverNameEnumerator nextObject] )
+	{
+		id<IServerData> server = [self getServerWithName: serverName];
+		NSParameterAssert( server != nil );
+        if ( ! [server respondsToSelector: @selector(encodeWithCoder:)] )
+		{
+			[savableServers removeObjectForKey: serverName];
+			
+			NSEnumerator *groupEnumerator = [savableGroups objectEnumerator];
+			NSMutableDictionary *group;
+			while ( group = [groupEnumerator nextObject] )
+				[group removeObjectForKey: serverName];
+		}
+	}
+	
+	[coder encodeObject: savableServers forKey: RFB_SERVER_LIST];
+	[coder encodeObject: savableGroups forKey: RFB_GROUP_LIST];
+}
+
 - (id)initWithCoder:(NSCoder *)coder
 {
 	[self autorelease];
@@ -245,6 +252,13 @@ static ServerDataManager* gInstance = nil;
 				bContinueOuter = NO;
 			}
 		}while( bContinueOuter );
+		
+		id<IServerData> server;
+		NSEnumerator* objEnumerator = [mServers objectEnumerator];
+		while( server = [objEnumerator nextObject] )
+		{
+			[server setDelegate:self];
+		}
 	}
 	
     return self;
@@ -253,58 +267,7 @@ static ServerDataManager* gInstance = nil;
 
 - (void)applicationWillTerminate:(NSNotification *)notification
 {
-	[self save];
-    [self release];
-}
-
-- (void)putServers:(NSArray *)servers inDictionary:(NSMutableDictionary *)dict
-{
-    NSEnumerator        *en = [servers objectEnumerator];
-    PersistentServer    *server;
-
-    while ((server = [en nextObject]) != nil)
-        [dict setObject:[server propertyDict] forKey:[server saveName]];
-}
-
-- (void)saveStandardServers
-{
-    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-    
-    [self putServers:[mGroups objectForKey:@"Standard"] inDictionary:dict];
-    [[NSUserDefaults standardUserDefaults] setObject:dict
-                                              forKey:RFB_SAVED_SERVERS2];
-}
-
-- (void)saveRendezvousServers
-{
-    NSDictionary            *stored;
-    NSMutableDictionary     *dict;
-
-    stored = [[NSUserDefaults standardUserDefaults]
-                                objectForKey:RFB_SAVED_RENDEZVOUS_SERVERS];
-    dict = [NSMutableDictionary dictionaryWithDictionary:stored];
-    [self putServers:[mGroups objectForKey:@"Rendezvous"] inDictionary:dict];
-    [[NSUserDefaults standardUserDefaults] setObject:dict
-                                         forKey:RFB_SAVED_RENDEZVOUS_SERVERS];
-}
-
-- (void)save
-{
-    [self saveStandardServers];
-    [self saveRendezvousServers];
-}
-
-- (void)saveRendezvousServer: (PersistentServer *)server
-{
-    NSUserDefaults      *defaults = [NSUserDefaults standardUserDefaults];
-    NSDictionary        *immutServers;
-    NSMutableDictionary *servers;
-
-    immutServers = [defaults objectForKey:RFB_SAVED_RENDEZVOUS_SERVERS];
-    servers = [NSMutableDictionary dictionaryWithDictionary:immutServers];
-
-    [servers setObject:[server propertyDict] forKey:[server saveName]];
-	[defaults setObject:servers forKey:RFB_SAVED_RENDEZVOUS_SERVERS];
+	[self release];
 }
 
 - (unsigned) serverCount
@@ -375,17 +338,13 @@ static ServerDataManager* gInstance = nil;
 {	
 	NSString* name;
 	NSEnumerator* groupKeys = [mGroups keyEnumerator];
-
-    // deletes keychain password, if there is one
-    [server setRememberPassword:NO];
-	
 	while( name = [groupKeys nextObject] )
 	{
 		[[mGroups objectForKey:name] removeObjectForKey:[server name]];
 	}
 	
 	assert( nil == [mServers objectForKey:[server name]] );
-
+	
 	[[NSNotificationCenter defaultCenter] postNotificationName:ServerListChangeMsg
 														object:self];
 }
@@ -406,7 +365,7 @@ static ServerDataManager* gInstance = nil;
 	}
 }
 
-- (ServerFromPrefs *)createServerByName:(NSString*)name
+- (id<IServerData>)createServerByName:(NSString*)name
 {
 	NSMutableString *nameHelper = [NSMutableString stringWithString:name];
 	
@@ -419,15 +378,17 @@ static ServerDataManager* gInstance = nil;
 	NSParameterAssert( nil != [mServers objectForKey:nameHelper] );
 	NSParameterAssert( newServer == [mServers objectForKey:nameHelper] );
 	
+	[newServer setDelegate:self];
+	
 	[[NSNotificationCenter defaultCenter] postNotificationName:ServerListChangeMsg
 														object:self];
 	
 	return newServer;
 }
 
-- (ServerFromPrefs *)addServer:(id<IServerData>)server
+- (id<IServerData>)addServer:(id<IServerData>)server
 {
-	ServerFromPrefs *newServer = [self createServerByName:[server name]];
+	id<IServerData> newServer = [self createServerByName:[server name]];
 	NSString* nameHolder = [newServer name];
 	
 	[newServer copyServer: server];
@@ -517,8 +478,6 @@ static ServerDataManager* gInstance = nil;
 		}
 		else
 		{
-            [self saveRendezvousServers];
-
 			[mServiceBrowser_VNC release];
 			[mServiceBrowser_RFB release];
 			mServiceBrowser_VNC = nil;
@@ -579,6 +538,10 @@ static ServerDataManager* gInstance = nil;
 	// because the server name will not necessarily match that of the service published
 	[mRendezvousNameToServer setObject:newServer forKey:[aNetService name]];
 	
+	// Set delegate before adding to the server lists so that the server has a chance
+	// to appropriately validate the name as defined by the service
+	[newServer setDelegate:self];
+	
 	[mServers setObject:newServer forKey:[newServer name]];
 	[[mGroups objectForKey:@"Rendezvous"] setObject:newServer forKey:[newServer name]];
 	
@@ -606,11 +569,8 @@ static ServerDataManager* gInstance = nil;
 	
 	[serverToRemove retain];
 	
-    [mRendezvousNameToServer removeObjectForKey:[aNetService name]];
 	[[mGroups objectForKey:@"Rendezvous"] removeObjectForKey:[serverToRemove name]];
     [mServers removeObjectForKey:[serverToRemove name]];
-
-    [self saveRendezvousServer:serverToRemove];
 	
 	[serverToRemove release];
     

@@ -20,24 +20,24 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "PersistentServer.h"
+#import "ServerBase.h"
 #import "IServerData.h"
 @class ServerDataManager;
 
 /* A server which is or can be stored in our preferences */
-@interface ServerFromPrefs : PersistentServer {
+@interface ServerFromPrefs : ServerBase {
 }
 
 + (id<IServerData>)createWithName:(NSString*)name;
 + (id<IServerData>)createWithHost:(NSString*)hostName preferenceDictionary:(NSDictionary*)prefDict;
 
 - (id)initWithHost:(NSString*)host preferenceDictionary:(NSDictionary*)prefDict;
-- (id)initWithName:(NSString *)name andDictionary:(NSDictionary *)dict;
 
 /* @name Archiving and Unarchiving
  * Implements the NSCoding protocol for serialization
  */
 //@{
+- (void)encodeWithCoder:(NSCoder*)coder;
 - (id)initWithCoder:(NSCoder*)coder;
 //@}
 
@@ -46,6 +46,10 @@
  */
 //@{
 - (bool)doYouSupport: (SUPPORT_TYPE)type;
+
+- (void)setName: (NSString*)name;
+- (void)setPassword: (NSString*)password;
+- (void)setRememberPassword: (bool)rememberPassword;
 //@}
 
 @end

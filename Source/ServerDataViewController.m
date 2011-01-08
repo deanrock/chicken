@@ -30,9 +30,6 @@
 #import "ServerBase.h"
 #import "ServerDataManager.h"
 #import "ServerStandAlone.h"
-#import "ServerFromPrefs.h"
-
-#define DISPLAY_MAX 50 // numbers >= this are interpreted as a port
 
 @implementation ServerDataViewController
 
@@ -127,8 +124,7 @@
 	// Set properties in dialog box
     if (mServer != nil)
 	{
-        NSString    *str;
-        int         port = [mServer port];
+        NSString    *str = @"";
 
         if( NO == removedSaveCheckbox && NO == [mServer respondsToSelector:@selector(setAddToServerListOnConnect:)] )
 		{
@@ -137,58 +133,47 @@
 		
 		[hostName setEnabled: YES];
 		[password setEnabled: YES];
+		[display setEnabled: YES];
 		[shared setEnabled: YES];
 		[profilePopup setEnabled: YES];
 		
-        if (port < DISPLAY_MAX) {
-            // Low port numbers have to be encoded as host:port so they won't be
-            // interpreted as display numbers
-            NSString *host = [mServer host];
-            NSRange  colon = [host rangeOfString:@":"];
-            NSString *fmt;
-            NSString *hostAndPort;
-
-            fmt = colon.location == NSNotFound ? @"%@:%d" : @"[%@]:%d";
-            hostAndPort = [NSString stringWithFormat:fmt, host, port];
-            [hostName setStringValue:hostAndPort];
-            [display setStringValue:@""];
-            [display setEnabled:NO];
-            str = [NSString stringWithFormat:NSLocalizedString(@"PortNum", nil),
-                    port];
-        } else {
-            [hostName setStringValue:[mServer host]];
-            if (port >= PORT_BASE && port < PORT_BASE + DISPLAY_MAX) {
-                NSString    *fmt = NSLocalizedString(@"DisplayIsPort", nil);
-
-                [display setIntValue:port - PORT_BASE];
-                str = [NSString stringWithFormat:fmt, port - PORT_BASE, port];
-            } else {
-                [display setIntValue:port];
-                str = [NSString stringWithFormat:NSLocalizedString(@"PortNum", nil),
-                        port];
-            }
-            [display setEnabled: YES];
-        }
-        [displayDescription setStringValue:str];
-
-            /* It's important to do password before rememberPwd so that
-             * the latter will reflect a failure to retrieve the
-             * passsword from the key chain. */
+		[hostName setStringValue:[mServer hostAndPort]];
 		[password setStringValue:[mServer password]];
         [rememberPwd setIntValue:[mServer rememberPassword]];
+        [display setIntValue:[mServer display]];
         [shared setIntValue:[mServer shared]];
 		[fullscreen setIntValue:[mServer fullscreen]];
 		[viewOnly setIntValue:[mServer viewOnly]];
-		[self setProfilePopupToProfile: [mServer profile]];
+		[self setProfilePopupToProfile: [mServer lastProfile]];
 		
 		[hostName    setEnabled: [mServer doYouSupport:EDIT_ADDRESS]];
 		[display     setEditable:[mServer doYouSupport:EDIT_PORT]];
 		[password    setEnabled: [mServer doYouSupport:EDIT_PASSWORD]];
-		[rememberPwd setEnabled: [mServer respondsToSelector:@selector(setRememberPassword:)]];
+		[rememberPwd setEnabled: [mServer doYouSupport:SAVE_PASSWORD]];
 		[connectBtn  setEnabled: [mServer doYouSupport:CONNECT]];
 
         [viewOnly setEnabled: YES];
         [fullscreen setEnabled: YES];
+		
+		if ( [mServer isPortSpecifiedInHost] ) {
+			[display setEnabled: NO];
+            [displayDescription setStringValue:@""];
+            str = [NSString stringWithFormat:NSLocalizedString(@"PortNum", nil),
+                    [mServer port]];
+        } else {
+            int         val = [mServer display];
+
+            if (val < DISPLAY_MAX)
+                str = [NSString stringWithFormat:NSLocalizedString(@"DisplayIsPort", nil),
+                        val, val + PORT_BASE];
+            else if (val >= PORT_BASE && val < PORT_BASE + DISPLAY_MAX)
+                str = [NSString stringWithFormat:NSLocalizedString(@"PortIsDisplay", nil),
+                        val, val - PORT_BASE];
+            else
+                str = [NSString stringWithFormat:NSLocalizedString(@"PortNum", nil),
+                        val];
+        }
+        [displayDescription setStringValue:str];
     }
 	else
 	{
@@ -219,14 +204,13 @@
 	[self loadProfileIntoView];
 }
 
-- (void)setProfilePopupToProfile: (Profile *)profile
+- (void)setProfilePopupToProfile: (NSString *)profileName
 {
-	if ( profile )
-		[profilePopup selectItemWithTitle: [profile profileName]];
-	else {
-        ProfileDataManager *profiles = [ProfileDataManager sharedInstance];
-		[profilePopup selectItemWithTitle: [profiles defaultProfileName]];
-    }
+	ProfileManager *profiles = [ProfileManager sharedManager];
+	if ( profileName && [profiles profileNamed: profileName] )
+		[profilePopup selectItemWithTitle: profileName];
+	else
+		[profilePopup selectItemWithTitle: [[profiles defaultProfile] profileName]];
 }
 
 - (void)loadProfileIntoView
@@ -239,7 +223,7 @@
     [[profilePopup menu] addItem: [NSMenuItem separatorItem]];
     [profilePopup addItemWithTitle:NSLocalizedString(@"EditProfiles", nil)];
 	
-	[self setProfilePopupToProfile: [mServer profile]];
+	[self setProfilePopupToProfile: [mServer lastProfile]];
 }
 
 - (void)setSaveCheckboxIsVisible:(BOOL)visible
@@ -269,25 +253,6 @@
 	return mServer;
 }
 
-- (void)takePortFromDisplay
-{
-    int         val = [display intValue];
-    NSString    *str;
-
-    if (val > DISPLAY_MAX) {
-        NSString    *fmt = NSLocalizedString(@"PortNum", nil);
-
-        str = [NSString stringWithFormat:fmt, val];
-        [mServer setPort:val];
-    } else {
-        NSString    *fmt = NSLocalizedString(@"DisplayIsPort", nil);
-
-        str = [NSString stringWithFormat:fmt, val, val + PORT_BASE];
-        [mServer setDisplay:val];
-    }
-    [displayDescription setStringValue:str];
-}
-
 - (void)controlTextDidChange:(NSNotification *)aNotification
 {
 	NSControl* sender = [aNotification object];
@@ -296,24 +261,14 @@
 	{
 		if( nil != mServer && [mServer doYouSupport:EDIT_PORT] )
 		{
-            [self takePortFromDisplay];
+			[mServer setDisplay:[sender intValue]];
 		}
 	}
 	else if( hostName == sender )
 	{
 		if( nil != mServer && [mServer doYouSupport:EDIT_ADDRESS] )
 		{
-			BOOL portSpec = [mServer setHostAndPort:[sender stringValue]];
-
-            [display setEnabled:!portSpec];
-            if (portSpec) {
-                NSString    *fmt = NSLocalizedString(@"PortNum", nil);
-                NSString    *str;
-
-                str = [NSString stringWithFormat:fmt, [mServer port]];
-                [displayDescription setStringValue:str];
-            } else
-                [self takePortFromDisplay];
+			[mServer setHostAndPort:[sender stringValue]];
 		}
 	}
 	else if( password == sender )
@@ -329,8 +284,7 @@
 {
 	if( nil != mServer )
 	{
-        if ([mServer respondsToSelector:@selector(setRememberPassword:)])
-            [mServer setRememberPassword:[sender state]];
+		[mServer setRememberPassword:![mServer rememberPassword]];
 	}
 }
 
@@ -345,17 +299,16 @@
 - (IBAction)profileSelectionChanged:(id)sender
 {
     if ([sender indexOfSelectedItem] == [sender numberOfItems] - 1) {
-        Profile *profile = [mServer profile];
-
+        NSString    *profile = [mServer lastProfile];
         // :TORESOLVE: this flickers the popup in the "Edit" state
         //          how to prevent this? some way to reject selection change?
-        [self setProfilePopupToProfile:profile];
-
-        [[ProfileManager sharedManager] showWindowWithProfile:[profile profileName]];
+        [self setProfilePopupToProfile: profile];
+        // open profile manager window
+        [[ProfileManager sharedManager] showWindowWithProfile:profile];
     }
     else if( nil != mServer )
 	{
-		[mServer setProfileName:[sender titleOfSelectedItem]];
+		[mServer setLastProfile:[sender titleOfSelectedItem]];
 	}
 }
 
@@ -377,18 +330,15 @@
 
 - (IBAction)addServerChanged:(id)sender
 {
-    if ([sender state]) {
-        [rememberPwd setEnabled:YES];
-    } else {
-        [rememberPwd setState:NSOffState];
-        [rememberPwd setEnabled:NO];
-    }
+	if( nil != mServer )
+	{
+		[(id)mServer setAddToServerListOnConnect:![mServer addToServerListOnConnect]];
+	}
 }
 
 - (IBAction)showProfileManager:(id)sender
 {
-    NSString    *name = [[mServer profile] profileName];
-    [[ProfileManager sharedManager] showWindowWithProfile:name];
+    [[ProfileManager sharedManager] showWindowWithProfile:[mServer lastProfile]];
 }
 
 - (NSBox*)box
@@ -399,7 +349,6 @@
 - (IBAction)connectToServer:(id)sender
 {
     NSWindow *window;
-    ServerBase  *server;
 
     saveCheckboxWasVisible = !removedSaveCheckbox;
     [self setSaveCheckboxIsVisible: NO];
@@ -412,20 +361,13 @@
     [connectBtn setAction: @selector(cancelConnect:)];
     [connectBtn setKeyEquivalent:@"."];
     [connectBtn setKeyEquivalentModifierMask:NSCommandKeyMask];
-
-    if( [save state] )
-    {
-        ServerFromPrefs *s = [[ServerDataManager sharedInstance] addServer:mServer];
-        [s setRememberPassword:[rememberPwd state]];
-        server = s;
-    } else
-        server = mServer;
 	
+    Profile* profile = [[ProfileManager sharedManager] profileNamed:[mServer lastProfile]];
+    
     // Asynchronously creates a connection to the server
     window = superController ? [superController window] : [self window];
-    connectionWaiter = [[ConnectionWaiter alloc] initWithServer:server
-                            profile:[mServer profile] delegate:self window:window];
-    [[ServerDataManager sharedInstance] save]; // just in case we crash
+    connectionWaiter = [[ConnectionWaiter alloc] initWithServer:mServer
+                            profile:profile delegate:self window:window];
     if (connectionWaiter == nil)
         [self connectionFailed];
 }
@@ -445,6 +387,11 @@
 
     [superController connectionDone];
     [self connectionAttemptEnded];
+
+    if( [mServer addToServerListOnConnect] )
+    {
+        [[ServerDataManager sharedInstance] addServer:mServer];
+    }
 
     if( YES == selfTerminate )
     {

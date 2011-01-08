@@ -27,7 +27,6 @@
 @protocol ConnectionDelegate;
 @class RFBConnection;
 @class RFBConnectionManager;
-@class ServerBase;
 
 @interface ServerDataViewController : NSWindowController
                                             <ConnectionWaiterDelegate>
@@ -48,7 +47,7 @@
 	IBOutlet NSProgressIndicator *connectIndicator;
 	IBOutlet NSTextField *connectIndicatorText;
 	
-	ServerBase  *mServer;
+	id<IServerData> mServer;
 	
 	bool selfTerminate;
 	bool removedSaveCheckbox;
@@ -86,7 +85,7 @@
 
 - (void)updateView:(id)notification;
 - (void)updateProfileView:(id)notification;
-- (void)setProfilePopupToProfile: (Profile *)profileName;
+- (void)setProfilePopupToProfile: (NSString *)profileName;
 
 - (void)loadProfileIntoView;
 

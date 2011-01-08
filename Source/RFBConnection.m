@@ -30,7 +30,6 @@
 #import "KeyEquivalentManager.h"
 #import "KeyEquivalentScenario.h"
 #import "Keymap.h"
-#import "PersistentServer.h"
 #import "PrefController.h"
 #import "Profile.h"
 #import "ProfileManager.h"
@@ -322,7 +321,7 @@
 
     [self connectionProblem];
     [authMessage setStringValue: aReason];
-    if ([server_ respondsToSelector:@selector(setRememberPassword:)])
+    if ([server_ doYouSupport:SAVE_PASSWORD])
         [rememberNewPassword setState: [server_ rememberPassword]];
     else
         [rememberNewPassword setHidden:YES];
@@ -339,11 +338,7 @@
     password = [[passwordField stringValue] retain];
     if ([rememberNewPassword state])
         [server_ setPassword: password];
-    if ([server_ respondsToSelector:@selector(setRememberPassword:)]) {
-        [server_ setRememberPassword: [rememberNewPassword state]];
-        [[NSNotificationCenter defaultCenter] postNotificationName:ServerChangeMsg
-                                                            object:server_];
-    }
+    [server_ setRememberPassword: [rememberNewPassword state]];
 
     [_reconnectReason setStringValue:@""];
     [self connectionTerminatedSheetDidEnd:nil returnCode:NSAlertAlternateReturn
@@ -460,7 +455,6 @@
 	wf.origin.x = floor((NSWidth(screenRect) - NSWidth(wf))/2 + NSMinX(screenRect));
 	wf.origin.y = floor((NSHeight(screenRect) - NSHeight(wf))*2/3 + NSMinY(screenRect));
 	
-    // :TOFIX: this doesn't work for unnamed servers
 	serverName = [server_ name];
 	if(![window setFrameUsingName:serverName]) {
 		// NSLog(@"Window did NOT have an entry: %@\n", serverName);
