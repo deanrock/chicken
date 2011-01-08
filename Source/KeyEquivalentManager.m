@@ -88,10 +88,10 @@ NSString *kConnectionFullscreenScenario = @"ConnectionFullscreenScenario";
 	RFBConnection *connection = [view delegate];
 	if (connection)
 	{
-        if ([connection viewOnly])
-            [self setCurrentScenarioToName: kNonConnectionWindowFrontmostScenario];
-        else if ( [connection connectionIsFullscreen] )
+        if ( [connection connectionIsFullscreen] )
 			[self setCurrentScenarioToName: kConnectionFullscreenScenario];
+        else if ([connection viewOnly])
+            [self setCurrentScenarioToName: kNonConnectionWindowFrontmostScenario];
 		else
 			[self setCurrentScenarioToName: kConnectionWindowFrontmostScenario];
 	}
