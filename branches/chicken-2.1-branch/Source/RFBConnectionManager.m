@@ -55,6 +55,7 @@ static NSString *kPrefs_LastHost_Key = @"RFBLastHost";
 - (void)applicationWillTerminate:(NSNotification *)notification
 {
 	[[NSUserDefaults standardUserDefaults] synchronize];
+    [self release];
 }
 
 - (void)reloadServerArray
@@ -125,6 +126,17 @@ static NSString *kPrefs_LastHost_Key = @"RFBLastHost";
 
     connectionWaiter = nil;
     lockedSelection = -1;
+}
+
+- (void)dealloc
+{
+    /* We're being deliberately sloppy here. The point is just to get
+     * ServerDataViewController to deallocate the current server, so that it
+     * will be saved, if it's a Rendezvous server. No need to release anything
+     * else since we're about to quit. */
+    [mServerCtrler release];
+    mServerCtrler = nil;
+    [super dealloc];
 }
 
 - (BOOL)runFromCommandLine
