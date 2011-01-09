@@ -118,6 +118,16 @@
 	
 	[self updateView:nil];
 }
+
+- (void)releaseServer
+{
+    /* This is just a hack that gets called as we're shutting down. Rendezvous
+     * servers save on dealloc, so we have to make sure that the currently
+     * selected server gets dealloc'ed, in case it is a Rendezvous server which
+     * has had changes. */
+    [mServer release];
+    mServer = nil;
+}
 	
 - (void)updateView:(id)notification
 {	

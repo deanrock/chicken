@@ -61,6 +61,7 @@
 
 - (void)setServer:(id<IServerData>)server;
 - (id<IServerData>)server;
+- (void)releaseServer;
 
 - (IBAction)rememberPwdChanged:(id)sender;
 - (IBAction)profileSelectionChanged:(id)sender;
