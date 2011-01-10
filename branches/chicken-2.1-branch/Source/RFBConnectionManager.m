@@ -670,7 +670,7 @@ static NSString *kPrefs_LastHost_Key = @"RFBLastHost";
 	RFBConnection *thisConnection;
 	
 	while (thisConnection = [connectionEnumerator nextObject]) {
-		if ([thisConnection hasKeyWindow]) {
+		if (![thisConnection hasKeyWindow]) {
 			[thisConnection setFrameBufferUpdateSeconds: interval];
 		}
 	}
